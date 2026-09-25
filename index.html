@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GENESIS — 스스로 진화하는 세계</title>
+<style>
+  :root{
+    --bg:#07090f; --panel:#0d1119ee; --line:#1c2434; --ink:#c9d4e8; --dim:#5f6d85;
+    --accent:#5eead4; --warn:#f4a261; --danger:#ef6b6b; --violet:#a78bfa;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
+    font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif}
+  #world{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:crosshair}
+  .panel{position:absolute;background:var(--panel);border:1px solid var(--line);
+    border-radius:12px;backdrop-filter:blur(10px);padding:14px 16px;font-size:12.5px;line-height:1.55;
+    transition:opacity 1.8s ease}
+  body.zen .panel{opacity:0.07}
+  body.zen .panel:hover{opacity:1;transition:opacity .25s ease}
+  body.zen #hint{opacity:0}
+  #hint{transition:opacity 1.8s ease}
+  #hud{top:16px;left:16px;width:270px}
+  #hud h1{font-size:15px;letter-spacing:.22em;color:var(--accent);margin-bottom:2px}
+  #hud .sub{color:var(--dim);font-size:11px;margin-bottom:10px}
+  .row{display:flex;justify-content:space-between;padding:1.5px 0}
+  .row b{font-variant-numeric:tabular-nums;font-weight:600}
+  .row .k{color:var(--dim)}
+  #graph{width:100%;height:56px;margin-top:8px;border-radius:6px;background:#0a0e16;border:1px solid var(--line)}
+  #controls{display:flex;gap:6px;margin-top:10px}
+  #controls button{flex:1;background:#141b2a;border:1px solid var(--line);color:var(--ink);
+    border-radius:8px;padding:6px 0;font-size:12px;cursor:pointer;font-family:inherit}
+  #controls button:hover{border-color:var(--accent);color:var(--accent)}
+  #controls button.on{background:var(--accent);color:#04211c;border-color:var(--accent);font-weight:700}
+  #chronicle{bottom:16px;left:16px;width:340px;max-height:34vh;overflow:hidden}
+  #chronicle h2, #inspect h2{font-size:11px;letter-spacing:.18em;color:var(--dim);margin-bottom:8px}
+  #log{display:flex;flex-direction:column-reverse;gap:4px;max-height:calc(34vh - 50px);overflow-y:auto}
+  #log::-webkit-scrollbar{width:4px}
+  #log::-webkit-scrollbar-thumb{background:var(--line);border-radius:2px}
+  .ev{font-size:12px;color:var(--dim);animation:fade .6s ease}
+  .ev .t{color:#3d4a63;font-variant-numeric:tabular-nums;margin-right:6px}
+  .ev.birth{color:var(--accent)} .ev.death{color:var(--danger)}
+  .ev.species{color:var(--violet)} .ev.mile{color:var(--warn);font-weight:600}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1}}
+  #inspect{top:16px;right:16px;width:250px;display:none}
+  #inspect .name{font-size:14px;font-weight:700;margin-bottom:6px}
+  .bar{height:5px;border-radius:3px;background:#141b2a;margin:3px 0 8px;overflow:hidden}
+  .bar i{display:block;height:100%;border-radius:3px;background:var(--accent);transition:width .3s}
+  #genes{display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;font-size:11.5px;margin-top:6px}
+  #genes .k{color:var(--dim)}
+  #hint{position:absolute;bottom:16px;right:16px;color:#38445c;font-size:11px;text-align:right;line-height:1.7}
+  #dex{bottom:70px;right:16px;width:250px;max-height:46vh;overflow-y:auto}
+  #dex h2{font-size:11px;letter-spacing:.18em;color:var(--dim);margin-bottom:8px}
+  #dex::-webkit-scrollbar{width:4px}
+  #dex::-webkit-scrollbar-thumb{background:var(--line);border-radius:2px}
+  .sp-row{display:flex;align-items:center;gap:7px;padding:2px 0;font-size:12px}
+  .sp-dot{width:9px;height:9px;border-radius:50%;flex:none}
+  .sp-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sp-meta{color:var(--dim);font-size:11px;font-variant-numeric:tabular-nums}
+  .sp-row.dom .sp-name::after{content:" 👑"}
+  .rec{display:flex;justify-content:space-between;font-size:11.5px;padding:1.5px 0}
+  .rec .k{color:var(--dim)} .rec b{font-weight:600;font-variant-numeric:tabular-nums}
+  .legend-mark{color:var(--warn)}
+  #evBadges{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+  #evBadges:empty{display:none}
+  .badge{font-size:10.5px;padding:2px 8px;border-radius:20px;border:1px solid var(--line);
+    background:#141b2a;animation:pulse 2s ease-in-out infinite}
+  .badge.ice{color:#8ecbff;border-color:#28425f} .badge.bloom{color:#8fe8a0;border-color:#2c5738}
+  .badge.storm{color:#d3b6ff;border-color:#4b3670} .badge.plague{color:#ffa1a1;border-color:#5f2c2c}
+  @keyframes pulse{0%,100%{opacity:.75}50%{opacity:1}}
+</style>
+</head>
+<body>
+<canvas id="world"></canvas>
+
+<div class="panel" id="hud">
+  <h1>GENESIS</h1>
+  <div class="sub">seed <span id="seed"></span> · 스스로 진화하는 세계</div>
+  <div class="row"><span class="k">시대</span><b id="epoch">0</b></div>
+  <div class="row"><span class="k">개체 수</span><b id="pop">0</b></div>
+  <div class="row"><span class="k">현존 종</span><b id="species">0</b></div>
+  <div class="row"><span class="k">누적 세대</span><b id="gen">0</b></div>
+  <div class="row"><span class="k">누적 탄생 / 죽음</span><b><span id="births">0</span> / <span id="deaths">0</span></b></div>
+  <div class="row"><span class="k">세계 유형</span><b id="wtype">—</b></div>
+  <div id="evBadges"></div>
+  <canvas id="graph" width="238" height="56"></canvas>
+  <div id="controls">
+    <button id="btnPause">⏸</button>
+    <button id="btn1" class="on">1×</button>
+    <button id="btn4">4×</button>
+    <button id="btn16">16×</button>
+    <button id="btnMeteor" title="대멸종">☄</button>
+    <button id="btnSound" title="앰비언트 사운드">🔇</button>
+  </div>
+</div>
+
+<div class="panel" id="chronicle">
+  <h2>세계 연대기</h2>
+  <div id="log"></div>
+</div>
+
+<div class="panel" id="inspect">
+  <h2>관찰 대상</h2>
+  <div class="name" id="iName"></div>
+  <div class="row"><span class="k">에너지</span><b id="iEnergy"></b></div>
+  <div class="bar"><i id="iEnergyBar"></i></div>
+  <div class="row"><span class="k">나이 / 세대</span><b id="iAge"></b></div>
+  <div class="row"><span class="k">자손</span><b id="iKids"></b></div>
+  <div id="genes"></div>
+</div>
+
+<div class="panel" id="dex">
+  <h2>종 도감</h2>
+  <div id="dexList"></div>
+  <h2 style="margin-top:12px">명예의 전당</h2>
+  <div id="records"></div>
+</div>
+
+<div id="hint">클릭 — 생명체 관찰 · Space — 일시정지<br>세계는 당신 없이도 계속된다</div>
+
+<script>
+"use strict";
+// ───────────────────────── RNG & Noise ─────────────────────────
+const _urlSeed=new URLSearchParams(location.search).get('seed');
+const SEED = _urlSeed ? (parseInt(_urlSeed,36)||1) : (Math.random()*1e9)|0;
+{ const el=document.getElementById('seed');
+  el.textContent=SEED.toString(36);
+  el.style.cursor='pointer'; el.title='클릭하면 이 세계의 공유 링크가 복사됩니다';
+  el.onclick=()=>{ const u=location.origin+location.pathname+'?seed='+SEED.toString(36);
+    navigator.clipboard?.writeText(u); el.textContent='링크 복사됨!';
+    setTimeout(()=>el.textContent=SEED.toString(36),1200); };
+}
+let _s = SEED>>>0;
+function rnd(){ _s^=_s<<13; _s>>>=0; _s^=_s>>17; _s^=_s<<5; _s>>>=0; return _s/4294967296; }
+function rr(a,b){ return a+rnd()*(b-a); }
+
+// value noise (procedural planet)
+const PERM = new Uint8Array(512);
+{ const p=[...Array(256).keys()]; for(let i=255;i>0;i--){const j=(rnd()*(i+1))|0;[p[i],p[j]]=[p[j],p[i]];}
+  for(let i=0;i<512;i++)PERM[i]=p[i&255]; }
+function vnoise(x,y){
+  const xi=Math.floor(x)&255, yi=Math.floor(y)&255, xf=x-Math.floor(x), yf=y-Math.floor(y);
+  const u=xf*xf*(3-2*xf), v=yf*yf*(3-2*yf);
+  const h=(a,b)=>PERM[(PERM[a&255]+b)&255]/255;
+  const a=h(xi,yi), b=h(xi+1,yi), c=h(xi,yi+1), d=h(xi+1,yi+1);
+  return a+(b-a)*u+(c-a)*v+(a-b-c+d)*u*v;
+}
+function fbm(x,y){ let s=0,a=.5,f=1; for(let i=0;i<5;i++){s+=a*vnoise(x*f,y*f);a*=.5;f*=2.1;} return s; }
+
+// ───────────────────────── World grid ─────────────────────────
+const cv=document.getElementById('world'), ctx=cv.getContext('2d');
+let W=innerWidth, H=innerHeight; cv.width=W; cv.height=H;
+addEventListener('resize',()=>{W=innerWidth;H=innerHeight;cv.width=W;cv.height=H;paintTerrain();});
+
+const GW=160, GH=100;                 // terrain grid
+const elev=new Float32Array(GW*GH);   // elevation
+const fert=new Float32Array(GW*GH);   // fertility (plant regrowth rate)
+const plant=new Float32Array(GW*GH);  // current plant biomass 0..1
+const SEA=0.42;
+for(let y=0;y<GH;y++)for(let x=0;x<GW;x++){
+  const e=fbm(x*0.045,y*0.045);
+  elev[y*GW+x]=e;
+  fert[y*GW+x]=Math.max(0, fbm(x*0.03+40,y*0.03+40)-0.35)*1.8;
+  plant[y*GW+x]= e>SEA ? fert[y*GW+x]*rnd() : 0;
+}
+const isLand=i=>elev[i]>SEA;
+function cellAt(px,py){
+  let gx=Math.floor(px/W*GW), gy=Math.floor(py/H*GH);
+  gx=Math.max(0,Math.min(GW-1,gx)); gy=Math.max(0,Math.min(GH-1,gy));
+  return gy*GW+gx;
+}
+
+// pre-render terrain to offscreen canvas
+const terr=document.createElement('canvas');
+function paintTerrain(){
+  terr.width=W; terr.height=H;
+  const t=terr.getContext('2d'); const img=t.createImageData(W,H); const d=img.data;
+  for(let py=0;py<H;py++)for(let px=0;px<W;px++){
+    const e=elev[cellAt(px,py)];
+    let r,g,b;
+    if(e<=SEA){ const q=e/SEA; r=6+q*8; g=12+q*22; b=28+q*46; }        // deep→shallow sea
+    else{ const q=(e-SEA)/(1-SEA);
+      if(q>0.72){ r=70+q*60; g=72+q*58; b=80+q*60; }                    // mountains
+      else{ r=16+q*14; g=26+q*20; b=20+q*12; }                          // dark land
+    }
+    const i=(py*W+px)*4; d[i]=r; d[i+1]=g; d[i+2]=b; d[i+3]=255;
+  }
+  t.putImageData(img,0,0);
+}
+paintTerrain();
+
+// ── world profile: 이 시드는 어떤 행성인가 (마인크래프트 시드 감성)
+const worldProfile=(()=>{
+  const seen=new Uint8Array(GW*GH); const sizes=[];
+  let landN=0, fertSum=0;
+  for(let i=0;i<GW*GH;i++) if(isLand(i)){ landN++; fertSum+=fert[i]; }
+  for(let i=0;i<GW*GH;i++){
+    if(!isLand(i)||seen[i])continue;
+    let sz=0; const st=[i]; seen[i]=1;
+    while(st.length){ const j=st.pop(); sz++;
+      const x=j%GW, y=(j/GW)|0;
+      for(const d of [[1,0],[-1,0],[0,1],[0,-1]]){
+        const nx=x+d[0], ny=y+d[1];
+        if(nx<0||ny<0||nx>=GW||ny>=GH)continue;
+        const k=ny*GW+nx;
+        if(isLand(k)&&!seen[k]){seen[k]=1;st.push(k);}
+      }
+    }
+    if(sz>25) sizes.push(sz);
+  }
+  sizes.sort((a,b)=>b-a);
+  const landPct=landN/(GW*GH), fertAvg=landN?fertSum/landN:0;
+  const nCont=sizes.length;
+  let type;
+  if(nCont<=1) type= landPct>0.5 ? '판게아형' : '외딴 대륙형';
+  else if(nCont<=3) type='대륙 분리형';
+  else if(nCont<=6) type='다도해형';
+  else type='군도형';
+  if(fertAvg>0.5) type+=' · 풍요';
+  else if(fertAvg<0.28) type+=' · 척박';
+  return {type, nCont, landPct, fertAvg};
+})();
+
+// ───────────────────────── Genome & Brain ─────────────────────────
+// brain: 6 inputs → 5 hidden → 3 outputs (turn, accel, wantMate)
+const NI=6, NH=5, NO=3, NW=NI*NH+NH+NH*NO+NO;
+function newBrain(){ const w=new Float32Array(NW); for(let i=0;i<NW;i++)w[i]=rr(-1.2,1.2); return w; }
+function think(w,inp,out){
+  const h=new Float32Array(NH); let k=0;
+  for(let j=0;j<NH;j++){ let s=0; for(let i=0;i<NI;i++)s+=inp[i]*w[k++]; s+=w[k++]; h[j]=Math.tanh(s); }
+  for(let o=0;o<NO;o++){ let s=0; for(let j=0;j<NH;j++)s+=h[j]*w[k++]; s+=w[k++]; out[o]=Math.tanh(s); }
+}
+function newGenome(){
+  return { size:rr(.7,1.3), speed:rr(.7,1.3), sense:rr(.7,1.3),
+           carn:rnd()<.12?rr(.55,.9):rr(0,.25),   // 육식성 0~1
+           hue:rnd()*360, fert:rr(.7,1.3), long:rr(.7,1.3), brain:newBrain() };
+}
+let MUT=1; // 변이 폭풍 시 3
+function mutate(g){
+  const m={...g, brain:g.brain.slice()};
+  const tweak=(v,amt,lo,hi)=>Math.max(lo,Math.min(hi, v+rr(-amt*MUT,amt*MUT)));
+  m.size =tweak(m.size ,.08,.4,2.2); m.speed=tweak(m.speed,.08,.4,2.2);
+  m.sense=tweak(m.sense,.08,.4,2.2); m.fert =tweak(m.fert ,.08,.4,2.2);
+  m.long =tweak(m.long ,.08,.4,2.2); m.carn =tweak(m.carn ,.05,0,1);
+  m.hue=(m.hue+rr(-14,14)+360)%360;
+  for(let i=0;i<NW;i++) if(rnd()<.12) m.brain[i]+=rr(-.35,.35)*MUT;
+  if(rnd()<.015){ // 드문 대변이
+    m.carn=Math.min(1,Math.max(0,m.carn+rr(-.4,.4))); m.hue=(m.hue+rr(-70,70)+360)%360;
+  }
+  return m;
+}
+function gdist(a,b){
+  return Math.abs(a.size-b.size)+Math.abs(a.speed-b.speed)+Math.abs(a.sense-b.sense)
+       + Math.abs(a.carn-b.carn)*2.5 + Math.abs(a.hue-b.hue)/90;
+}
+
+// ───────────────────────── Species naming ─────────────────────────
+const SYL1=['아','베','크','도','엘','파','그','히','이','조','칼','루','모','네','오','피'];
+const SYL2=['라','린','노','무','리','사','타','베','미','칸','록','젠','바','두'];
+const SYL3=['스','온','아','움','인','오르','에','악','임','우스'];
+function speciesName(){ return SYL1[(rnd()*SYL1.length)|0]+SYL2[(rnd()*SYL2.length)|0]+SYL3[(rnd()*SYL3.length)|0]; }
+const speciesReg=[]; // {name, proto(genome), count, born(epoch), extinct}
+function classify(g){
+  for(const s of speciesReg){ if(!s.extinct && gdist(g,s.proto)<1.15) return s; }
+  const s={name:speciesName(), proto:{...g}, count:0, born:epoch, extinct:false};
+  speciesReg.push(s);
+  if(epoch>10) logEv(`신종 <b>${s.name}</b> 출현 — ${g.carn>.45?'포식자':'초식'} 계열`, 'species');
+  return s;
+}
+
+// ───────────────────────── Creatures ─────────────────────────
+let epoch=0, births=0, deaths=0, maxGen=1, nextId=1;
+const pods=[];
+// ── 기록과 전설
+const records={oldestAge:0,oldestName:'—',kidsMax:0,kidsName:'—',peakPop:0,peakEpoch:0,legends:0};
+const LEG1=['불멸의','방랑자','대모','시조','검은','흰','바람의','땅울림','새벽','황혼의'];
+const LEG2=['카른','오딘','베라','문','솔','한','그림','누리','단','아라'];
+function legendName(){ return LEG1[(rnd()*LEG1.length)|0]+' '+LEG2[(rnd()*LEG2.length)|0]; }
+let domSpecies=null, lastApex=-9999;
+function spawn(x,y,genome,gen,parent){
+  const g=genome||newGenome();
+  const c={ id:nextId++, x,y, a:rnd()*Math.PI*2, vx:0,vy:0,
+    g, energy:60+rnd()*30, age:0, gen:gen||1, kids:0,
+    maxAge:(900+rnd()*500)*g.long, sp:classify(g), out:new Float32Array(NO), parent:parent||0 };
+  c.sp.count++; pods.push(c);
+  if(parent){ puff(c.x,c.y,'birth',g.hue); sfx('birth',g.hue); }
+  if(g.size>1.85 && g.carn>0.75 && epoch>lastApex+2500 && epoch>600){
+    lastApex=epoch; c.legend=c.legend||('괴수 '+legendName()); records.legends++;
+    logEv(`👹 <b>${c.legend}</b> 출현 — 진화가 낳은 정점 포식자`, 'mile');
+    records.bigEvents=(records.bigEvents||0)+1;
+  }
+  return c;
+}
+// primordial soup: seed on fertile coasts
+{ let n=0, guard=0;
+  while(n<70 && guard++<8000){
+    const x=rnd()*W, y=rnd()*H;
+    if(isLand(cellAt(x,y))){ spawn(x,y); n++; }
+  }
+}
+logEv('원시 바다에서 최초의 생명 70개체가 상륙했다', 'mile');
+logEv(`이 행성은 <b>${worldProfile.type}</b> — 대륙 ${worldProfile.nCont}개, 육지 ${(worldProfile.landPct*100)|0}%, 비옥도 ${(worldProfile.fertAvg*100)|0}%`, 'mile');
+document.getElementById('wtype').textContent=worldProfile.type;
+
+// spatial hash: rebuilt each world step, 64px buckets
+const BK=64; let BW=1,BH=1,buckets=[];
+function rebuildBuckets(){
+  BW=Math.ceil(W/BK); BH=Math.ceil(H/BK);
+  buckets=Array.from({length:BW*BH},()=>[]);
+  for(const c of pods){
+    const bx=Math.min(BW-1,Math.max(0,(c.x/BK)|0)), by=Math.min(BH-1,Math.max(0,(c.y/BK)|0));
+    buckets[by*BW+bx].push(c);
+  }
+}
+function nearestOf(c,range){
+  const bx=(c.x/BK)|0, by=(c.y/BK)|0;
+  let best=null, bd=range, crowd=0;
+  for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+    const X=bx+dx, Y=by+dy; if(X<0||Y<0||X>=BW||Y>=BH)continue;
+    for(const o of buckets[Y*BW+X]){ if(o===c)continue;
+      const d=Math.abs(o.x-c.x)+Math.abs(o.y-c.y);
+      if(d<40)crowd++;
+      if(d<bd){bd=d;best=o;}
+    }
+  }
+  return [best,bd,crowd];
+}
+
+const inp=new Float32Array(NI);
+function stepCreature(c){
+  c.age++;
+  const g=c.g;
+  // ── sense: nearest plant-rich cell & nearest creature
+  const sense=60*g.sense;
+  let fx=0, fy=0, fbest=0;
+  for(let k=0;k<6;k++){ // sample 6 rays
+    const an=c.a+ (k-2.5)*0.5;
+    const sx=c.x+Math.cos(an)*sense*0.7, sy=c.y+Math.sin(an)*sense*0.7;
+    const ci=cellAt(sx,sy); const v=isLand(ci)?plant[ci]:( -0.5 );
+    if(v>fbest){ fbest=v; fx=Math.cos(an); fy=Math.sin(an); }
+  }
+  const [near,nd,crowd]=nearestOf(c,Math.min(sense,BK));
+  const rel = near? Math.atan2(near.y-c.y,near.x-c.x)-c.a : 0;
+  inp[0]=fbest; inp[1]=Math.atan2(fy,fx)-c.a ? Math.sin(Math.atan2(fy,fx)-c.a):0;
+  inp[2]=near?1-nd/sense:0; inp[3]=near?Math.sin(rel):0;
+  inp[4]=c.energy/150-0.5; inp[5]=near? (near.g.carn - g.carn) : 0;
+
+  think(g.brain, inp, c.out);
+  const [turn, accel, wantMate]=c.out;
+  c.a += turn*0.25;
+  const sp = (0.5+Math.max(0,accel))*1.15*g.speed;
+  let nx=c.x+Math.cos(c.a)*sp, ny=c.y+Math.sin(c.a)*sp;
+  // sea blocks movement (drains energy fast if entered)
+  const ni=cellAt(nx,ny);
+  if(!isLand(ni)){ c.a+=Math.PI*0.5+rnd(); c.energy-=0.4; }
+  else { c.x=(nx+W)%W; c.y=(ny+H)%H; }
+
+  // ── metabolism
+  c.energy -= 0.20*g.size + sp*0.06 + 0.03*g.sense + crowd*0.06;
+  if(eff.plague===c.sp && epoch<eff.plagueUntil) c.energy-=0.14;
+
+  // ── eat
+  const ci=cellAt(c.x,c.y);
+  if(g.carn<0.55){ // herbivore side
+    const bite=Math.min(plant[ci], 0.06*(1-g.carn+0.3));
+    plant[ci]-=bite; c.energy+=bite*70;
+  }
+  if(g.carn>0.3 && near && nd<8+g.size*4 && near.g.size < g.size*1.25){ // hunt
+    const dmg=6*g.carn*g.size;
+    near.energy-=dmg; c.energy+=dmg*0.85;
+    if(near.energy<=0) kill(near,'포식');
+  }
+  c.energy=Math.min(c.energy, 160);
+
+  // ── reproduce (asexual w/ mutation)
+  if(c.energy>125 && wantMate>-0.2 && c.age>160*(2-g.fert) && pods.length<900){
+    c.energy-=70; c.kids++; births++;
+    if(c.kids>records.kidsMax){ records.kidsMax=c.kids; records.kidsName=(c.legend||c.sp.name+' #'+c.id); }
+    if(c.kids===12 && !c.legend){ c.legend=legendName(); records.legends++;
+      logEv(`전설 개체 <b>${c.legend}</b> 탄생 — ${c.sp.name}족, 자손 12`, 'mile'); }
+    const baby=spawn(c.x+rr(-6,6), c.y+rr(-6,6), mutate(g), c.gen+1, c.id);
+    if(baby.gen>maxGen){ maxGen=baby.gen;
+      if(maxGen%25===0) logEv(`세대 ${maxGen} 도달 — 진화는 멈추지 않는다`, 'mile'); }
+  }
+  if(c.energy<=0) kill(c,'아사');
+  else if(c.age>c.maxAge) kill(c,'노화');
+}
+function kill(c, cause){
+  const i=pods.indexOf(c); if(i<0)return;
+  pods.splice(i,1); deaths++;
+  puff(c.x,c.y,'death',c.g.hue);
+  if(c.age>records.oldestAge){ records.oldestAge=c.age; records.oldestName=(c.legend||c.sp.name+' #'+c.id); }
+  if(c.legend) logEv(`전설 <b>${c.legend}</b>, ${cause}로 눈감다 (${c.age} 시대, 자손 ${c.kids})`, 'death');
+  c.sp.count--;
+  plant[cellAt(c.x,c.y)] = Math.min(1, plant[cellAt(c.x,c.y)] + 0.25*c.g.size); // corpse fertilizes
+  if(c.sp.count<=0 && !c.sp.extinct){ c.sp.extinct=true;
+    if(epoch - c.sp.born > 300) logEv(`종 <b>${c.sp.name}</b> 멸종 (존속 ${epoch-c.sp.born} 시대)`, 'death');
+  }
+  if(sel===c){ sel=null; inspect.style.display='none'; }
+}
+
+// ───────────────────────── Rare events ─────────────────────────
+const eff={ice:0, bloom:0, storm:0, plague:null, plagueUntil:0};
+const fxList=[]; // {x,y,e0,type:'volcano'}
+
+function coastal(i){ // 육지인데 4방향 중 바다가 있는 칸
+  if(!isLand(i))return false;
+  const x=i%GW, y=(i/GW)|0;
+  return (x>0&&!isLand(i-1))||(x<GW-1&&!isLand(i+1))||(y>0&&!isLand(i-GW))||(y<GH-1&&!isLand(i+GW));
+}
+function evVolcano(){
+  // 가장 높은 지대 근처에서 분출
+  let best=-1,bi=0;
+  for(let t=0;t<400;t++){ const i=(rnd()*GW*GH)|0; if(elev[i]>best){best=elev[i];bi=i;} }
+  const gx=bi%GW, gy=(bi/GW)|0, px=(gx+0.5)/GW*W, py=(gy+0.5)/GH*H;
+  const R=Math.min(W,H)*0.13;
+  let dead=0;
+  for(let i=pods.length-1;i>=0;i--){ const c=pods[i];
+    if(Math.hypot(c.x-px,c.y-py)<R){ kill(c,'화산'); dead++; } }
+  for(let y=0;y<GH;y++)for(let x=0;x<GW;x++){
+    const d=Math.hypot((x+0.5)/GW*W-px,(y+0.5)/GH*H-py);
+    if(d<R) plant[y*GW+x]=0;
+    else if(d<R*2.2 && isLand(y*GW+x)) fert[y*GW+x]=Math.min(1.6, fert[y*GW+x]+0.5); // 화산재는 비옥함
+  }
+  fxList.push({x:px,y:py,e0:epoch,type:'volcano'});
+  logEv(`🌋 화산 분출 — ${dead}개체 소멸, 그러나 화산재가 대지를 비옥하게 하리라`, 'mile');
+}
+function evIceAge(){ eff.ice=epoch+1600; logEv('❄ 빙하기 도래 — 초목의 성장이 멈춘다 (1600 시대)', 'mile'); }
+function evBloom(){ eff.bloom=epoch+1000; logEv('🌸 대번영기 — 온 대지가 꽃핀다 (1000 시대)', 'mile'); }
+function evStorm(){ eff.storm=epoch+800; logEv('☄ 유성우 — 변이 폭풍이 유전자를 뒤흔든다 (800 시대)', 'mile'); }
+function evPlague(){
+  let top=null;
+  for(const s of speciesReg) if(!s.extinct&&s.count>2&&(!top||s.count>top.count)) top=s;
+  if(!top)return;
+  eff.plague=top; eff.plagueUntil=epoch+900;
+  logEv(`🦠 역병 창궐 — 최다 종 <b>${top.name}</b>이(가) 병들다 (900 시대)`, 'mile');
+}
+function evTsunami(){
+  let dead=0;
+  for(let i=pods.length-1;i>=0;i--){ const c=pods[i];
+    if(coastal(cellAt(c.x,c.y)) && rnd()<0.65){ kill(c,'해일'); dead++; } }
+  for(let i=0;i<GW*GH;i++) if(coastal(i)) plant[i]*=0.1;
+  logEv(`🌊 대해일 — 해안이 휩쓸려 ${dead}개체가 사라졌다`, 'mile');
+}
+function evUplift(){
+  // 초희귀: 바다에서 신대륙 융기
+  let ci=-1;
+  for(let t=0;t<600;t++){ const i=(rnd()*GW*GH)|0; if(elev[i]<SEA-0.08){ci=i;break;} }
+  if(ci<0)return;
+  const cx=ci%GW, cy=(ci/GW)|0, R=5+rnd()*4;
+  for(let y=0;y<GH;y++)for(let x=0;x<GW;x++){
+    const d=Math.hypot(x-cx,y-cy);
+    if(d<R){ const q=1-d/R; const i=y*GW+x;
+      elev[i]=Math.max(elev[i], SEA+0.06+q*0.15); fert[i]=Math.max(fert[i],0.7); plant[i]=0.3; }
+  }
+  paintTerrain();
+  logEv('🏝 신대륙 융기 — 바다 밑에서 새로운 땅이 솟아올랐다!', 'mile');
+}
+function rollEvents(){
+  if(epoch<600) return; // 창세기엔 평화를
+  if(rnd()<0.00045){
+    const r=rnd();
+    if(r<0.22) evVolcano();
+    else if(r<0.38) evIceAge();
+    else if(r<0.58) evBloom();
+    else if(r<0.72) evStorm();
+    else if(r<0.87) evPlague();
+    else evTsunami();
+    records.bigEvents=(records.bigEvents||0)+1;
+    sfx('boom');
+  }
+  if(rnd()<0.00003){ evUplift(); records.bigEvents=(records.bigEvents||0)+1; }
+  MUT = epoch<eff.storm ? 3 : 1;
+  if(eff.plague && epoch>=eff.plagueUntil){
+    if(!eff.plague.extinct) logEv(`역병이 물러갔다 — ${eff.plague.name}, 살아남다`, 'species');
+    eff.plague=null;
+  }
+}
+
+// ───────────────────────── World step ─────────────────────────
+function stepWorld(){
+  epoch++;
+  // plant regrowth (staggered)
+  rollEvents();
+  const growth = epoch<eff.ice ? 0.0008 : epoch<eff.bloom ? 0.0075 : 0.003;
+  const off=epoch%4;
+  for(let i=off;i<GW*GH;i+=4) if(isLand(i)) plant[i]=Math.min(1, plant[i]+fert[i]*growth);
+  rebuildBuckets();
+  for(let i=pods.length-1;i>=0;i--) stepCreature(pods[i]);
+  // extinction guard: re-seed if world dies
+  if(pods.length===0){
+    logEv('세계가 침묵했다… 그리고 다시, 생명이 움튼다', 'mile');
+    let n=0,guard=0; while(n<40&&guard++<6000){const x=rnd()*W,y=rnd()*H;if(isLand(cellAt(x,y))){spawn(x,y);n++;}}
+  }
+  if(pods.length>records.peakPop){ records.peakPop=pods.length; records.peakEpoch=epoch; }
+  if(epoch%150===0 && pods.length>30){ // 지배종·불사조 관측
+    let top=null;
+    for(const s of speciesReg) if(!s.extinct && s.count>0 && (!top||s.count>top.count)) top=s;
+    for(const s of speciesReg){
+      if(s.extinct) continue;
+      if(s.count===1 && !s.critical) s.critical=epoch;
+      else if(s.critical && s.count>=15){
+        if(!s.phoenix){
+          s.phoenix=true;
+          logEv(`🔥 불사조 — <b>${s.name}</b>, 단 하나의 개체에서 다시 일어서다 (${epoch-s.critical} 시대 만에)`, 'mile');
+          records.bigEvents=(records.bigEvents||0)+1;
+        }
+        s.critical=0;
+      }
+      else if(s.critical && epoch-s.critical>5000) s.critical=0; // 너무 오래되면 무효
+    }
+    if(top && top!==domSpecies && top.count>pods.length*0.28){
+      if(domSpecies) logEv(`지배종 교체 — <b>${top.name}</b>이(가) ${domSpecies.name}을(를) 밀어냈다`, 'species');
+      domSpecies=top;
+    }
+  }
+  if(epoch%20===0) histo.push(pods.length), histo.length>119&&histo.shift();
+}
+
+function meteor(){
+  logEv('☄ 운석 충돌 — 대멸종의 시대', 'mile');
+  const cx=rnd()*W, cy=rnd()*H, R=Math.min(W,H)*0.35;
+  for(let i=pods.length-1;i>=0;i--){ const c=pods[i];
+    const d=Math.hypot(c.x-cx,c.y-cy);
+    if(d<R || rnd()<0.5) kill(c,'운석');
+  }
+  for(let i=0;i<GW*GH;i++) plant[i]*=0.25;
+}
+
+// ───────────────────────── Ambient layer (구름·낮밤·파티클·비네트) ─────────────────────────
+const clouds=[];
+for(let k=0;k<4;k++){
+  const cc=document.createElement('canvas'); cc.width=280; cc.height=150;
+  const g2=cc.getContext('2d'); const im=g2.createImageData(280,150); const dd=im.data;
+  for(let y=0;y<150;y++)for(let x=0;x<280;x++){
+    const edge=Math.sin(Math.PI*x/280)*Math.sin(Math.PI*y/150);
+    const a=Math.max(0, fbm(x*0.018+k*11, y*0.03+k*17)-0.52)*3*edge;
+    const i=(y*280+x)*4; dd[i]=225; dd[i+1]=232; dd[i+2]=245; dd[i+3]=Math.min(255,a*80);
+  }
+  g2.putImageData(im,0,0);
+  clouds.push({cv:cc, x:rnd()*W, y:rnd()*H, vx:0.06+rnd()*0.12, s:1.1+rnd()*1.6});
+}
+let vig=null;
+function makeVig(){
+  vig=document.createElement('canvas'); vig.width=W; vig.height=H;
+  const g2=vig.getContext('2d');
+  const grd=g2.createRadialGradient(W/2,H/2,Math.min(W,H)*0.42,W/2,H/2,Math.max(W,H)*0.75);
+  grd.addColorStop(0,'rgba(0,0,0,0)'); grd.addColorStop(1,'rgba(2,4,10,0.5)');
+  g2.fillStyle=grd; g2.fillRect(0,0,W,H);
+}
+makeVig(); addEventListener('resize',makeVig);
+
+const parts=[]; // {x,y,t,type,hue}
+function puff(x,y,type,hue){ if(parts.length<400) parts.push({x,y,t:0,type,hue:hue||160}); }
+function drawAmbient(){
+  // 구름
+  for(const cl of clouds){
+    cl.x+=cl.vx; if(cl.x>W+150) { cl.x=-280*cl.s; cl.y=rnd()*H; }
+    ctx.globalAlpha=0.5; ctx.drawImage(cl.cv,cl.x,cl.y,280*cl.s,150*cl.s); ctx.globalAlpha=1;
+  }
+  // 파티클
+  for(let i=parts.length-1;i>=0;i--){ const p=parts[i]; p.t++;
+    if(p.t>70){parts.splice(i,1);continue;}
+    const q=p.t/70;
+    if(p.type==='birth'){ ctx.strokeStyle=`hsla(${p.hue|0} 80% 70% / ${0.7*(1-q)})`;
+      ctx.beginPath(); ctx.arc(p.x,p.y,2+q*16,0,7); ctx.stroke(); }
+    else { ctx.fillStyle=`hsla(${p.hue|0} 40% 80% / ${0.5*(1-q)})`;
+      ctx.beginPath(); ctx.arc(p.x,p.y-q*10,2.2*(1-q),0,7); ctx.fill(); }
+  }
+  // 낮과 밤 (한 주기 ≈ 4200 시대)
+  const dn=0.5+0.5*Math.sin(epoch*0.0015);
+  const nightA=(1-dn)*0.30;
+  if(nightA>0.02){ ctx.fillStyle=`rgba(8,12,34,${nightA})`; ctx.fillRect(0,0,W,H); }
+  const duskA=Math.max(0,0.13-Math.abs(dn-0.5)*0.55);
+  if(duskA>0.01){ ctx.fillStyle=`rgba(255,140,60,${duskA})`; ctx.fillRect(0,0,W,H); }
+  ctx.drawImage(vig,0,0);
+}
+
+// ───────────────────────── Ambient sound (WebAudio) ─────────────────────────
+let AC=null, master=null, soundOn=false, lastNote=0;
+const PENTA=[261.6,293.7,329.6,392,440,523.3,587.3,659.3];
+function initAudio(){
+  AC=new (window.AudioContext||window.webkitAudioContext)();
+  master=AC.createGain(); master.gain.value=0.14; master.connect(AC.destination);
+  // 저역 패드 드론
+  for(const [f,g] of [[55,.05],[110,.035],[164.8,.02]]){
+    const o=AC.createOscillator(), gn=AC.createGain(), lfo=AC.createOscillator(), lg=AC.createGain();
+    o.type='sine'; o.frequency.value=f; gn.gain.value=g;
+    lfo.frequency.value=0.05+rnd()*0.06; lg.gain.value=g*0.5;
+    lfo.connect(lg); lg.connect(gn.gain);
+    o.connect(gn); gn.connect(master); o.start(); lfo.start();
+  }
+}
+function sfx(type,hue){
+  if(!soundOn||!AC) return;
+  const now=AC.currentTime, ms=performance.now();
+  if(type==='birth'){
+    if(ms-lastNote<260) return; lastNote=ms;
+    const o=AC.createOscillator(), g=AC.createGain();
+    o.type='sine'; o.frequency.value=PENTA[((hue||0)/360*PENTA.length)|0]||440;
+    g.gain.setValueAtTime(0.0001,now); g.gain.exponentialRampToValueAtTime(0.09,now+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001,now+1.4);
+    o.connect(g); g.connect(master); o.start(now); o.stop(now+1.5);
+  } else if(type==='boom'){
+    const o=AC.createOscillator(), g=AC.createGain();
+    o.type='sine'; o.frequency.setValueAtTime(80,now); o.frequency.exponentialRampToValueAtTime(30,now+1.8);
+    g.gain.setValueAtTime(0.0001,now); g.gain.exponentialRampToValueAtTime(0.22,now+0.05);
+    g.gain.exponentialRampToValueAtTime(0.0001,now+2.2);
+    o.connect(g); g.connect(master); o.start(now); o.stop(now+2.3);
+  }
+}
+
+// ───────────────────────── Render ─────────────────────────
+function render(){
+  ctx.drawImage(terr,0,0);
+  // plants (오프스크린 캐시, 12프레임마다 갱신)
+  if(!render.plantCv || render.plantCv.width!==W){ render.plantCv=document.createElement('canvas');
+    render.plantCv.width=W; render.plantCv.height=H; render.pf=0; }
+  if((render.pf=(render.pf||0)+1)%12===1){
+    const pc=render.plantCv.getContext('2d'); pc.clearRect(0,0,W,H);
+    const cw=W/GW, ch=H/GH;
+    for(let y=0;y<GH;y++)for(let x=0;x<GW;x++){
+      const p=plant[y*GW+x]; if(p<0.06)continue;
+      pc.fillStyle=`rgba(70,${120+p*90|0},70,${p*0.55})`;
+      pc.fillRect(x*cw,y*ch,cw+0.5,ch+0.5);
+    }
+  }
+  ctx.drawImage(render.plantCv,0,0);
+  // selected creature trail
+  if(sel){
+    trail.push(sel.x,sel.y); if(trail.length>240) trail.splice(0,2);
+    ctx.strokeStyle='rgba(94,234,212,.35)'; ctx.beginPath();
+    for(let i=0;i<trail.length;i+=2){
+      const dx=Math.abs(trail[i]-(trail[i-2]||trail[i]));
+      if(i===0||dx>W/2) ctx.moveTo(trail[i],trail[i+1]); else ctx.lineTo(trail[i],trail[i+1]);
+    }
+    ctx.stroke();
+  }
+  // creatures
+  for(const c of pods){
+    const r=2.2+c.g.size*2.2;
+    const light = c.g.carn>.45? '62%':'55%';
+    ctx.fillStyle=`hsl(${c.g.hue|0} 75% ${light})`;
+    ctx.beginPath(); ctx.arc(c.x,c.y,r,0,7); ctx.fill();
+    // heading tick
+    ctx.strokeStyle='rgba(255,255,255,.5)'; ctx.beginPath();
+    ctx.moveTo(c.x,c.y); ctx.lineTo(c.x+Math.cos(c.a)*r*1.8, c.y+Math.sin(c.a)*r*1.8); ctx.stroke();
+    if(c.g.carn>.45){ ctx.strokeStyle=`hsl(${c.g.hue|0} 90% 70%)`; ctx.beginPath(); ctx.arc(c.x,c.y,r+2,0,7); ctx.stroke(); }
+    if(c.legend){ ctx.fillStyle='#f4a261'; ctx.font='9px sans-serif'; ctx.fillText('★', c.x-3, c.y-r-4); }
+  }
+  drawAmbient();
+  // 화산 잔광
+  for(let i=fxList.length-1;i>=0;i--){ const f=fxList[i]; const t=epoch-f.e0;
+    if(t>260){ fxList.splice(i,1); continue; }
+    const a=1-t/260, R=Math.min(W,H)*0.13;
+    const grd=ctx.createRadialGradient(f.x,f.y,0,f.x,f.y,R);
+    grd.addColorStop(0,`rgba(255,120,40,${a*0.65})`); grd.addColorStop(1,'rgba(255,60,0,0)');
+    ctx.fillStyle=grd; ctx.beginPath(); ctx.arc(f.x,f.y,R,0,7); ctx.fill();
+  }
+  // 기후 틴트
+  if(epoch<eff.ice){ ctx.fillStyle='rgba(140,190,255,0.10)'; ctx.fillRect(0,0,W,H); }
+  else if(epoch<eff.bloom){ ctx.fillStyle='rgba(120,255,150,0.05)'; ctx.fillRect(0,0,W,H); }
+  if(epoch<eff.storm){ ctx.fillStyle='rgba(190,140,255,0.06)'; ctx.fillRect(0,0,W,H); }
+  if(sel){ ctx.strokeStyle='#5eead4'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.arc(sel.x,sel.y,10+sel.g.size*3,0,7); ctx.stroke(); ctx.lineWidth=1;
+    updateInspect();
+  }
+  drawGraph();
+}
+const graph=document.getElementById('graph'), gtx=graph.getContext('2d');
+const histo=[];
+function drawGraph(){
+  gtx.clearRect(0,0,238,56);
+  if(histo.length<2)return;
+  const mx=Math.max(...histo,10);
+  gtx.strokeStyle='#5eead4'; gtx.beginPath();
+  histo.forEach((v,i)=>{ const x=i/(118)*238, y=54-v/mx*50; i?gtx.lineTo(x,y):gtx.moveTo(x,y); });
+  gtx.stroke();
+}
+
+// ───────────────────────── UI ─────────────────────────
+const $=id=>document.getElementById(id);
+function logEv(html,cls){
+  const logBox=document.getElementById('log');
+  const d=document.createElement('div'); d.className='ev '+(cls||'');
+  d.innerHTML=`<span class="t">E${epoch}</span>${html}`;
+  logBox.prepend(d); while(logBox.children.length>60) logBox.lastChild.remove();
+}
+let sel=null, trail=[]; const inspect=$('inspect');
+cv.addEventListener('click',e=>{
+  let best=null,bd=25;
+  for(const c of pods){ const d=Math.hypot(c.x-e.clientX,c.y-e.clientY); if(d<bd){bd=d;best=c;} }
+  sel=best; trail=[]; inspect.style.display=sel?'block':'none';
+});
+// ── 종 도감 & 명예의 전당 (0.5초마다)
+function updateDex(){
+  const live=speciesReg.filter(s=>!s.extinct&&s.count>0).sort((a,b)=>b.count-a.count);
+  $('dexList').innerHTML=live.slice(0,9).map(s=>
+    `<div class="sp-row${s===domSpecies?' dom':''}">
+       <span class="sp-dot" style="background:hsl(${s.proto.hue|0} 75% 58%)"></span>
+       <span class="sp-name">${s.name}</span>
+       <span class="sp-meta">${s.proto.carn>.45?'🦴':'🌿'} ${s.count} · E${s.born}~</span>
+     </div>`).join('') + (live.length>9?`<div class="sp-meta" style="padding:3px 0">…외 ${live.length-9}종</div>`:'');
+  $('records').innerHTML=
+    `<div class="rec"><span class="k">최장수</span><b>${records.oldestName} · ${records.oldestAge}</b></div>`+
+    `<div class="rec"><span class="k">최다 자손</span><b>${records.kidsName} · ${records.kidsMax}</b></div>`+
+    `<div class="rec"><span class="k">인구 피크</span><b>${records.peakPop} (E${records.peakEpoch})</b></div>`+
+    `<div class="rec"><span class="k">전설 개체</span><b class="legend-mark">★ ${records.legends}</b></div>`+
+    `<div class="rec"><span class="k">멸종한 종</span><b>${speciesReg.filter(s=>s.extinct).length}</b></div>`+
+    `<div class="rec"><span class="k">대사건</span><b>${records.bigEvents||0}</b></div>`;
+  const b=[];
+  if(epoch<eff.ice) b.push(`<span class="badge ice">❄ 빙하기 ${eff.ice-epoch}</span>`);
+  if(epoch<eff.bloom) b.push(`<span class="badge bloom">🌸 대번영기 ${eff.bloom-epoch}</span>`);
+  if(epoch<eff.storm) b.push(`<span class="badge storm">☄ 변이 폭풍 ${eff.storm-epoch}</span>`);
+  if(eff.plague&&epoch<eff.plagueUntil) b.push(`<span class="badge plague">🦠 ${eff.plague.name} 역병 ${eff.plagueUntil-epoch}</span>`);
+  $('evBadges').innerHTML=b.join('');
+}
+setInterval(updateDex,500); updateDex();
+function updateInspect(){
+  const c=sel;
+  $('iName').textContent=`${c.legend?'★ '+c.legend+' — ':''}${c.sp.name} #${c.id} ${c.g.carn>.45?'· 포식자':'· 초식'}`;
+  $('iName').style.color=`hsl(${c.g.hue|0} 75% 65%)`;
+  $('iEnergy').textContent=c.energy.toFixed(0);
+  $('iEnergyBar').style.width=Math.min(100,c.energy/160*100)+'%';
+  $('iAge').textContent=`${c.age} / ${c.gen}세대`;
+  $('iKids').textContent=c.kids;
+  const g=c.g;
+  $('genes').innerHTML=
+    `<span class="k">크기</span><span>${g.size.toFixed(2)}</span>`+
+    `<span class="k">속도</span><span>${g.speed.toFixed(2)}</span>`+
+    `<span class="k">감각</span><span>${g.sense.toFixed(2)}</span>`+
+    `<span class="k">육식성</span><span>${(g.carn*100).toFixed(0)}%</span>`+
+    `<span class="k">번식력</span><span>${g.fert.toFixed(2)}</span>`+
+    `<span class="k">수명</span><span>${g.long.toFixed(2)}</span>`;
+}
+let speed=1, paused=false;
+const btns={1:$('btn1'),4:$('btn4'),16:$('btn16')};
+function setSpeed(s){ speed=s; paused=false; $('btnPause').classList.remove('on');
+  for(const k in btns) btns[k].classList.toggle('on', +k===s); }
+$('btn1').onclick=()=>setSpeed(1); $('btn4').onclick=()=>setSpeed(4); $('btn16').onclick=()=>setSpeed(16);
+$('btnPause').onclick=()=>{ paused=!paused; $('btnPause').classList.toggle('on',paused); };
+$('btnMeteor').onclick=()=>{ meteor(); sfx('boom'); };
+$('btnSound').onclick=()=>{
+  if(!AC) initAudio();
+  soundOn=!soundOn;
+  if(soundOn){ AC.resume(); master.gain.value=0.14; }
+  else master.gain.value=0;
+  $('btnSound').textContent=soundOn?'🔊':'🔇';
+  $('btnSound').classList.toggle('on',soundOn);
+};
+addEventListener('keydown',e=>{ if(e.code==='Space'){e.preventDefault();$('btnPause').click();} });
+// ── 젠 모드: 8초 무입력 시 UI가 스르르 사라짐
+let zenT=0;
+function wake(){ document.body.classList.remove('zen'); clearTimeout(zenT);
+  zenT=setTimeout(()=>document.body.classList.add('zen'), 8000); }
+addEventListener('mousemove',wake); addEventListener('keydown',wake);
+addEventListener('mousedown',wake); wake();
+
+// ───────────────────────── Main loop ─────────────────────────
+function frame(){
+  if(!paused) for(let i=0;i<speed;i++) stepWorld();
+  render();
+  $('epoch').textContent=epoch; $('pop').textContent=pods.length;
+  $('species').textContent=speciesReg.filter(s=>!s.extinct&&s.count>0).length;
+  $('gen').textContent=maxGen; $('births').textContent=births; $('deaths').textContent=deaths;
+  requestAnimationFrame(frame);
+}
+frame();
+window.G={ get pods(){return pods}, get epoch(){return epoch}, get species(){return speciesReg},
+  get maxGen(){return maxGen}, get births(){return births}, get deaths(){return deaths},
+  get eff(){return eff}, get records(){return records},
+  step:n=>{for(let i=0;i<n;i++)stepWorld();} };
+</script>
+</body>
+</html>
